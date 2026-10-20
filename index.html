@@ -116,6 +116,28 @@ body{font-family:'Jost',sans-serif;background:var(--black);color:var(--white);mi
 .ztable td b{color:var(--white);font-weight:500;}
 .rep-foot{font-size:9px;color:var(--muted);text-align:center;margin-top:26px;letter-spacing:0.1em;line-height:1.7;font-weight:300;}
 .empty-note{font-size:12px;color:var(--muted);text-align:center;padding:30px 10px;font-weight:300;line-height:1.7;}
+.ex-ctl{display:flex;gap:5px;align-items:center;margin-left:6px;}
+.ctl-btn{background:none;border:1px solid rgba(201,168,76,0.35);color:var(--gold);border-radius:6px;font-size:13px;padding:3px 9px;cursor:pointer;line-height:1;font-family:'Jost',sans-serif;}
+.ctl-btn:active{background:rgba(201,168,76,0.12);}
+.sugg{font-size:11.5px;color:var(--gold-light);background:rgba(201,168,76,0.07);border-left:2px solid var(--gold);border-radius:4px;padding:7px 9px;margin:4px 0 8px;line-height:1.5;font-weight:300;}
+.swap-box{background:var(--dark);border:1px solid rgba(201,168,76,0.25);border-radius:8px;padding:9px;margin:8px 0;}
+.swap-box .sb-h{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold);margin-bottom:7px;}
+.swap-opt{display:block;width:100%;text-align:left;background:var(--charcoal);border:1px solid rgba(255,255,255,0.1);color:var(--white);border-radius:6px;padding:10px;margin-bottom:5px;font-family:'Jost',sans-serif;font-size:13px;cursor:pointer;}
+.swap-opt:active{border-color:var(--gold);}
+.hist-card{background:var(--charcoal);border:1px solid rgba(255,255,255,0.06);border-radius:12px;margin-bottom:9px;overflow:hidden;}
+.hist-head{padding:12px 13px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+.hist-date{font-size:14px;color:var(--white);font-weight:500;}
+.hist-sub{font-size:11px;color:var(--gold);margin-top:1px;}
+.hist-body{display:none;padding:2px 13px 12px;}
+.hist-card.open .hist-body{display:block;}
+.hist-row{font-size:12.5px;color:var(--muted);line-height:1.55;padding:5px 0;border-top:1px solid rgba(255,255,255,0.05);font-weight:300;}
+.hist-row b{color:var(--white);font-weight:500;}
+.sum-row{display:flex;gap:10px;margin-bottom:14px;}
+.sum-box{flex:1;background:var(--charcoal);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:12px;text-align:center;}
+.sum-num{font-family:'Cormorant Garamond',serif;font-size:27px;color:var(--gold-light);line-height:1;}
+.sum-lbl{font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+.hep-vid{max-width:250px;margin:0 auto 10px;border-radius:8px;overflow:hidden;background:#000;}
+.hep-vid video{width:100%;display:block;}
 </style>
 </head>
 <body>
@@ -130,6 +152,7 @@ body{font-family:'Jost',sans-serif;background:var(--black);color:var(--white);mi
   <div class="nav-grid">
     <div class="nav-card" onclick="go('page-session')"><span class="nav-icon">&#128170;</span><h3>Today's Session</h3><p>Build my workout</p></div>
     <div class="nav-card" onclick="go('page-running')"><span class="nav-icon">&#127939;</span><h3>7-Week Running</h3><p>Your run plan</p></div>
+    <div class="nav-card" onclick="go('page-progress')"><span class="nav-icon">&#128202;</span><h3>My Progress</h3><p>Past workouts</p></div>
     <div class="nav-card" onclick="go('page-guide')"><span class="nav-icon">&#128161;</span><h3>How It Works</h3><p>Zones, Hyrox, weights</p></div>
   </div>
   <p class="proprietary-line">&copy; OrthoCare Concierge LLC | Kelly Davis<br>Proprietary and confidential.</p>
@@ -145,6 +168,11 @@ body{font-family:'Jost',sans-serif;background:var(--black);color:var(--white);mi
     <button class="gen-btn" onclick="buildSession()">Build my session</button>
     <div id="session-out"></div>
   </div>
+</div>
+
+<div id="page-progress" class="page">
+  <div class="page-header"><button class="back-btn" onclick="go('splash')">&larr; Home</button><h2>My Progress</h2><p class="page-sub">Your past workouts</p></div>
+  <div class="page-content" id="progress-content"></div>
 </div>
 
 <div id="page-running" class="page">
@@ -422,224 +450,201 @@ const RUN_TIPS = [
   'Any sharp pain, run-down stretch, or bad sleep run, back off. Seven weeks out, fresh beats heroic.'
 ];
 /* ============  END OF DATA BLOCK  ============ */
-
 const NS='oc_gen_'+CLIENT_NAME.toLowerCase().replace(/[^a-z0-9]+/g,'_');
 let store={}; try{store=JSON.parse(localStorage.getItem(NS))||{};}catch(e){}
+store.sessions=store.sessions||[]; store.logs=store.logs||{}; store.last=store.last||{};
+var SWAP={};
 function persist(){try{localStorage.setItem(NS,JSON.stringify(store));}catch(e){}}
 function todayStr(){return new Date().toISOString().slice(0,10);}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(d){try{var dt=new Date(d+'T00:00:00');return dt.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});}catch(e){return d;}}
+function typeTag(t){var m={free:'DB',cable:'Cable',kb:'KB',trx:'TRX',bw:'Bodyweight',machine:'Machine',cardio:'Cardio'};return m[t]||'';}
+function blockHead(n,t){return `<div class="block"><div class="block-head"><span class="bnum">${n}</span><h3>${t}</h3></div></div>`;}
+const EMAIL_LABEL=(CLIENT_NAME==='Kelly'?'Email this session to myself':'Email this session to Kelly');
 
-let sel = {day:'full', focus:'auto'};
-let session = null;
+let sel={day:Object.keys(DAY_META)[0],focus:'auto'};
+let curId=null;
 
 function go(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.getElementById('splash').style.display=(id==='splash')?'flex':'none';
-  if(id!=='splash') document.getElementById(id).classList.add('active');
+  if(id!=='splash'){var el=document.getElementById(id);if(el)el.classList.add('active');}
   if(id==='page-session') renderPickers();
-  if(id==='page-running') renderRunning();
+  if(id==='page-progress') renderProgress();
   if(id==='page-guide') renderGuide();
+  if(id==='page-running') renderRunning();
+  if(id==='page-hep') renderHep();
   window.scrollTo(0,0);
 }
 
-/* ---------- PICKERS ---------- */
 function renderPickers(){
-  document.getElementById('day-chips').innerHTML = Object.keys(DAY_META).map(k=>
-    `<div class="chip${sel.day===k?' on':''}" onclick="setDay('${k}')"><div class="ct">${DAY_META[k].label}</div><div class="cs">${DAY_META[k].sub}</div></div>`).join('');
-  const foci=[['auto','Surprise me','I pick for you'],['strength','Strength','heavier · 5–6'],['endurance','Endurance','12–20 reps'],['hyrox','Hyrox','station pace']];
-  document.getElementById('focus-chips').innerHTML = foci.map(f=>
-    `<div class="chip${sel.focus===f[0]?' on':''}" onclick="setFocus('${f[0]}')"><div class="ct">${f[1]}</div><div class="cs">${f[2]}</div></div>`).join('');
+  document.getElementById('day-chips').innerHTML=Object.keys(DAY_META).map(function(k){return `<div class="chip${sel.day===k?' on':''}" onclick="setDay('${k}')"><div class="ct">${DAY_META[k].label}</div><div class="cs">${DAY_META[k].sub}</div></div>`;}).join('');
+  var foci=[['auto','Surprise me','I pick for you']].concat(Object.keys(DOSE).map(function(k){return [k,DOSE[k].label,DOSE[k].reps];}));
+  document.getElementById('focus-chips').innerHTML=foci.map(function(f){return `<div class="chip${sel.focus===f[0]?' on':''}" onclick="setFocus('${f[0]}')"><div class="ct">${f[1]}</div><div class="cs">${f[2]}</div></div>`;}).join('');
+  if(!curId && store.sessions[0]) curId=store.sessions[0].id;
+  if(curId) renderSession(); else document.getElementById('session-out').innerHTML='';
 }
 function setDay(k){sel.day=k;renderPickers();}
 function setFocus(k){sel.focus=k;renderPickers();}
 
-/* ---------- GENERATOR ---------- */
-function rollFocus(){const r=Math.random();return r<0.3?'strength':(r<0.7?'endurance':'hyrox');}
-function pickOne(pool,used){
-  const avail=pool.filter(e=>!used.has(e.n));
-  const src=avail.length?avail:pool;
-  const e=src[Math.floor(Math.random()*src.length)];
-  used.add(e.n); return e;
+function poolFor(key){
+  if(key==='EXTRA_LOWER')     return [].concat(BANK.squat,BANK.hinge,BANK.lunge);
+  if(key==='FULL_LOWER_PUSH') return [].concat(BANK.squat,BANK.lunge);
+  if(key==='FULL_UPPER_PUSH') return [].concat(BANK.pushH,BANK.pushV);
+  if(key==='FULL_UPPER_PULL') return [].concat(BANK.pullH,BANK.pullV);
+  if(key==='HYROX')           return BANK.hyrox;
+  return BANK[key]||[];
 }
-function resolveSlot(key,used){
-  if(key==='HYROX')            return pickOne(BANK.hyrox,used);
-  if(key==='EXTRA_LOWER')      return pickOne([].concat(BANK.squat,BANK.hinge,BANK.lunge),used);
-  if(key==='FULL_LOWER_PUSH')  return pickOne([].concat(BANK.squat,BANK.lunge),used);
-  if(key==='FULL_UPPER_PUSH')  return pickOne([].concat(BANK.pushH,BANK.pushV),used);
-  if(key==='FULL_UPPER_PULL')  return pickOne([].concat(BANK.pullH,BANK.pullV),used);
-  return pickOne(BANK[key],used);
-}
+function pickOne(pool,used){var a=pool.filter(function(e){return !used.has(e.n);});var src=a.length?a:pool;var e=src[Math.floor(Math.random()*src.length)];used.add(e.n);return e;}
+function rollFocus(){var ks=Object.keys(DOSE);return ks[Math.floor(Math.random()*ks.length)];}
+
 function buildSession(){
-  const used=new Set();
-  const focus = sel.focus==='auto'?rollFocus():sel.focus;
-  const main = DAY_SLOTS[sel.day].map(k=>resolveSlot(k,used));
-  // warm-up: 2 general + 2 region
-  const warmUsed=new Set();
-  let warm=[pickOne(BANK.warmGen,warmUsed),pickOne(BANK.warmGen,warmUsed)];
-  if(sel.day==='ue'){warm.push(pickOne(BANK.warmUpper,warmUsed),pickOne(BANK.warmUpper,warmUsed));}
-  else if(sel.day==='le'){warm.push(pickOne(BANK.warmLower,warmUsed),pickOne(BANK.warmLower,warmUsed));}
-  else{warm.push(pickOne(BANK.warmUpper,warmUsed),pickOne(BANK.warmLower,warmUsed));}
-  const coreN = Math.random()<0.45?2:1;
-  const coreUsed=new Set(); const core=[]; for(let i=0;i<coreN;i++) core.push(pickOne(BANK.core,coreUsed));
-  const cardio = pickOne(BANK.cardio,new Set());
-  session={day:sel.day,focus:focus,date:todayStr(),warm:warm,main:main,core:core,cardio:cardio};
-  renderSession();
-  setTimeout(()=>{const o=document.getElementById('session-out');if(o)o.scrollIntoView({behavior:'smooth',block:'start'});},60);
+  var used=new Set();
+  var focus=sel.focus==='auto'?rollFocus():sel.focus;
+  var id='s'+Date.now(); var c=0; function uid(){return id+'-'+(c++);}
+  var main=DAY_SLOTS[sel.day].map(function(k){var e=pickOne(poolFor(k),used);return {uid:uid(),kind:'main',slot:k,e:e};});
+  var wUsed=new Set();
+  var warmEx=[pickOne(BANK.warmGen,wUsed),pickOne(BANK.warmGen,wUsed)];
+  if(sel.day==='ue') warmEx.push(pickOne(BANK.warmUpper,wUsed),pickOne(BANK.warmUpper,wUsed));
+  else if(sel.day==='le') warmEx.push(pickOne(BANK.warmLower,wUsed),pickOne(BANK.warmLower,wUsed));
+  else warmEx.push(pickOne(BANK.warmUpper,wUsed),pickOne(BANK.warmLower,wUsed));
+  var warm=warmEx.map(function(e){return {uid:uid(),kind:'warm',e:e};});
+  var coreN=Math.random()<0.45?2:1; var cUsed=new Set(); var core=[];
+  for(var i=0;i<coreN;i++) core.push({uid:uid(),kind:'core',e:pickOne(BANK.core,cUsed)});
+  var cardio=BANK.cardio?{uid:uid(),kind:'cardio',e:pickOne(BANK.cardio,new Set())}:null;
+  var rec={id:id,date:todayStr(),day:sel.day,focus:focus,warm:warm,main:main,core:core,cardio:cardio};
+  store.sessions.unshift(rec); if(store.sessions.length>80) store.sessions=store.sessions.slice(0,80);
+  curId=id; persist(); renderSession();
+  setTimeout(function(){var o=document.getElementById('session-out');if(o)o.scrollIntoView({behavior:'smooth',block:'start'});},60);
 }
+function curSession(){return store.sessions.find(function(s){return s.id===curId;})||store.sessions[0]||null;}
 
-/* ---------- RENDER SESSION ---------- */
-function mk(key){return session.date+'-'+session.day+'-'+key;}
-function lastKey(name){return 'lastwt-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'_');}
-
+function logFor(uid){return store.logs[uid]||{sets:[],feel:'',done:false};}
+function suggText(name){
+  var l=store.last[name]; if(!l||!l.sets||!l.sets.length) return '';
+  var rpes=l.sets.map(function(s){return parseFloat(s.rpe);}).filter(function(x){return !isNaN(x);});
+  var last=l.sets.filter(function(s){return s.wt||s.reps;}).map(function(s){return (s.wt||'?')+'×'+(s.reps||'?')+(s.rpe?(' @'+s.rpe):'');}).join(', ');
+  var tip='';
+  if(rpes.length){var mx=Math.max.apply(null,rpes);
+    if(mx<=6) tip='Felt easy last time, add a little.';
+    else if(mx>=9) tip='Very hard last time, ease it back a touch.';
+    else if(mx<=7) tip='Dialed in, repeat or nudge up if it feels good.';
+    else tip='Right in the zone, repeat and aim for clean reps.';}
+  return (last?('Last: '+last+(tip?'. ':'')):'')+tip;
+}
 function renderSession(){
-  if(!session){document.getElementById('session-out').innerHTML='';return;}
-  const d=DOSE[session.focus];
-  const machines=session.main.filter(e=>e.t==='machine');
-  const circuit=session.main.filter(e=>e.t!=='machine');
-  let html='';
-  html+=`<div class="intro-card" style="margin-top:18px;"><p><b style="color:var(--gold-light)">${DAY_META[session.day].label} &middot; ${d.label} day.</b> Here's today's set. Work your main lifts at <b style="color:var(--gold-light)">${d.reps} reps</b>, ${d.rir}, around <b style="color:var(--gold-light)">RPE ${d.rpe}</b> in Heart-Rate Zone ${d.zone}. Tap any exercise for the how-to and to log it.</p></div>`;
+  var rec=curSession(); if(!rec){document.getElementById('session-out').innerHTML='';return;}
+  var d=DOSE[rec.focus]; var html='';
+  html+=`<div class="intro-card" style="margin-top:18px;"><p><b style="color:var(--gold-light)">${DAY_META[rec.day].label} &middot; ${d.label}.</b> ${fmtDate(rec.date)}. Work your main lifts at <b style="color:var(--gold-light)">${d.reps}</b>, ${d.rir}, around <b style="color:var(--gold-light)">RPE ${d.rpe}</b>. Use the arrows to reorder and &#8646; to swap anything you cannot get to.</p></div>`;
   html+=`<button class="reroll" onclick="buildSession()">&#8635; Roll me a fresh set</button>`;
-
-  // Warm-up
-  html+=blockHead('1','Mobility Warm-Up');
-  html+=`<div class="block-note">Move through these once to loosen up and switch things on. No logging needed.</div>`;
-  session.warm.forEach((e,i)=>{html+=simpleCard('w'+i,e.n,'',e.c,false);});
-
-  // Main
-  html+=blockHead('2','Main Block');
-  html+=`<div class="recov">${RECOVERY_NOTE}</div>`;
-  let mi=0;
-  if(machines.length){
-    html+=`<div class="sub-head">Machines — straight sets</div>`;
-    machines.forEach(e=>{html+=mainCard('m'+mi,e,d);mi++;});
-  }
-  if(circuit.length){
-    html+=`<div class="sub-head">Free weights &amp; cables — move through as a circuit</div>`;
-    circuit.forEach(e=>{html+=mainCard('m'+mi,e,d);mi++;});
-  }
-
-  // Core
-  html+=blockHead('3','Core Finisher');
-  html+=`<div class="block-note">2–3 rounds &middot; 30–45 sec or 10–15 reps each &middot; RPE 6–7.</div>`;
-  session.core.forEach((e,i)=>{html+=simpleCard('c'+i,e.n,typeTag(e.t),e.c,true);});
-
-  // Cardio
-  html+=blockHead('4','Cardio Burst');
-  session.cardio && (html+=simpleCard('cv',session.cardio.n,'',session.cardio.c,true,session.cardio.rx));
-
-  // Cool-down
-  html+=blockHead('5','Cool-Down');
-  html+=`<div class="block-note">2–3 minutes of easy walking to bring your heart rate down, then stretch anything that worked hard today. Breathe.</div>`;
-
-  html+=`<button class="email-btn" onclick="emailLog()">&#9993; Email this session to myself</button>`;
-  html+=`<div class="rep-foot">Fresh set generated ${session.date}<br>OrthoCare Concierge LLC | Kelly Davis</div>`;
-
+  var n=0;
+  n++; html+=blockHead(n,'Mobility Warm-Up')+`<div class="block-note">Move through these once. No logging needed.</div>`;
+  rec.warm.forEach(function(it){html+=simpleCard(it,false);});
+  n++; html+=blockHead(n,'Main Block')+`<div class="recov">${RECOVERY_NOTE}</div>`;
+  rec.main.forEach(function(it,i){html+=mainCard(it,i,rec.main.length,d);});
+  n++; html+=blockHead(n,'Core Finisher')+`<div class="block-note">2&ndash;3 rounds &middot; 30&ndash;45 sec or 10&ndash;15 reps &middot; RPE 6&ndash;7.</div>`;
+  rec.core.forEach(function(it){html+=simpleCard(it,true);});
+  if(rec.cardio){n++; html+=blockHead(n,'Cardio Burst'); html+=simpleCard(rec.cardio,true);}
+  n++; html+=blockHead(n,'Cool-Down')+`<div class="block-note">Easy walk to bring the heart rate down, then stretch what worked hard.</div>`;
+  html+=`<button class="email-btn" onclick="emailLog()">&#9993; ${EMAIL_LABEL}</button>`;
+  html+=`<div class="rep-foot">${fmtDate(rec.date)} &middot; OrthoCare Concierge LLC | Kelly Davis</div>`;
   document.getElementById('session-out').innerHTML=html;
 }
-function blockHead(n,t){return `<div class="block"><div class="block-head"><span class="bnum">${n}</span><h3>${t}</h3></div></div>`;}
-function typeTag(t){const m={free:'DB',cable:'Cable',kb:'KB',trx:'TRX',bw:'Bodyweight',machine:'Machine'};return m[t]||'';}
+function simpleCard(it,check){
+  var e=it.e, uid=it.uid, done=logFor(uid).done;
+  var rx=e.rx?`<div class="ex-rx">${esc(e.rx)}</div>`:'';
+  var tag=(it.kind!=='warm'&&e.t)?`<span class="ex-tag">${typeTag(e.t)}</span>`:'';
+  var chk=check?`<div class="ex-check${done?' on':''}" onclick="toggleDone('${uid}',this)"></div>`:'';
+  var swapBtn=(it.kind==='core'||it.kind==='cardio'||it.kind==='warm')?`<div class="ex-ctl"><button class="ctl-btn" onclick="openSwap('${uid}')">&#8646;</button></div>`:'';
+  return `<div class="ex-card${done?' done':''}" id="x-${uid}"><div class="ex-head">${chk}<div class="ex-main" onclick="openCard('${uid}')"><div class="ex-name">${esc(e.n)}${tag}</div>${rx}</div>${swapBtn}<span class="chev" onclick="openCard('${uid}')">&#9660;</span></div><div class="ex-body"><div class="cue">${esc(e.c)}</div><div id="swap-${uid}"></div></div></div>`;
+}
+function mainCard(it,i,total,d){
+  var e=it.e, uid=it.uid, L=logFor(uid), done=L.done;
+  var sugg=suggText(e.n);
+  var pref=(L.sets&&L.sets.length)?L.sets:((store.last[e.n]&&store.last[e.n].sets.length)?store.last[e.n].sets:[{},{},{}]);
+  var rows=pref.map(function(s,si){return `<div class="log-row"><span class="setn">Set ${si+1}</span><input class="log-in" inputmode="numeric" placeholder="weight" value="${esc(s.wt||'')}" onchange="setLog('${uid}',${si},'wt',this.value)"><input class="log-in" inputmode="numeric" placeholder="reps" value="${esc(s.reps||'')}" onchange="setLog('${uid}',${si},'reps',this.value)"><input class="log-in" inputmode="numeric" placeholder="RPE" value="${esc(s.rpe||'')}" onchange="setLog('${uid}',${si},'rpe',this.value)"></div>`;}).join('');
+  var up=i>0?`<button class="ctl-btn" onclick="moveMain('${uid}',-1)">&#8593;</button>`:'';
+  var dn=i<total-1?`<button class="ctl-btn" onclick="moveMain('${uid}',1)">&#8595;</button>`:'';
+  return `<div class="ex-card${done?' done':''}" id="x-${uid}"><div class="ex-head"><div class="ex-check${done?' on':''}" onclick="toggleDone('${uid}',this)"></div><div class="ex-main" onclick="openCard('${uid}')"><div class="ex-name">${esc(e.n)}<span class="ex-tag">${typeTag(e.t)}</span></div><div class="ex-rx">${d.sets} sets &middot; ${d.reps} &middot; RPE ${d.rpe}</div></div><div class="ex-ctl">${up}${dn}<button class="ctl-btn" onclick="openSwap('${uid}')">&#8646;</button></div><span class="chev" onclick="openCard('${uid}')">&#9660;</span></div><div class="ex-body"><div class="cue">${esc(e.c)}</div><div class="dose-grid"><span class="dose-pill"><b>${d.sets}</b> sets</span><span class="dose-pill"><b>${d.reps}</b></span><span class="dose-pill">${d.rir}</span><span class="dose-pill">RPE <b>${d.rpe}</b></span>${d.zone?`<span class="dose-pill">Zone <b>${d.zone}</b></span>`:''}</div>${e.coach?`<div class="coach-note">&#9733; Kelly: ${esc(e.coach)}</div>`:''}${sugg?`<div class="sugg">${esc(sugg)}</div>`:''}<div id="swap-${uid}"></div><div class="log-wrap"><div class="log-title">Log your sets &nbsp;&middot;&nbsp; weight / reps / RPE</div>${rows}<button class="add-set" onclick="addSet('${uid}')">+ Add set</button><div class="feel-row"><input class="log-in" placeholder="How did it feel? (optional note)" value="${esc(L.feel||'')}" onchange="setFeel('${uid}',this.value)"></div></div></div></div>`;
+}
+function openCard(uid){var el=document.getElementById('x-'+uid);if(el)el.classList.toggle('open');}
+function toggleDone(uid,el){if(window.event)window.event.stopPropagation();var L=store.logs[uid]||{sets:[],feel:'',done:false};L.done=!L.done;store.logs[uid]=L;persist();var c=document.getElementById('x-'+uid);c.classList.toggle('done',L.done);el.classList.toggle('on',L.done);}
+function setLog(uid,si,f,v){var rec=curSession();var it=findItem(rec,uid);var name=it?it.e.n:uid;var L=store.logs[uid]||{sets:[],feel:'',done:false};while(L.sets.length<=si)L.sets.push({});L.sets[si][f]=v;store.logs[uid]=L;var kept=L.sets.filter(function(s){return s.wt||s.reps||s.rpe;});if(kept.length){store.last[name]={sets:kept.map(function(s){return {wt:s.wt||'',reps:s.reps||'',rpe:s.rpe||''};}),date:rec.date};}persist();}
+function setFeel(uid,v){var L=store.logs[uid]||{sets:[],feel:'',done:false};L.feel=v;store.logs[uid]=L;persist();}
+function addSet(uid){var rec=curSession();var it=findItem(rec,uid);var name=it?it.e.n:'';var L=store.logs[uid];if(!L){var seed=(store.last[name]&&store.last[name].sets.length)?store.last[name].sets.map(function(s){return {wt:s.wt,reps:s.reps,rpe:s.rpe};}):[{},{},{}];L={sets:seed,feel:'',done:false};}L.sets.push({});store.logs[uid]=L;persist();renderSession();}
+function moveMain(uid,dir){var rec=curSession();var idx=rec.main.findIndex(function(it){return it.uid===uid;});var j=idx+dir;if(j<0||j>=rec.main.length)return;var t=rec.main[idx];rec.main[idx]=rec.main[j];rec.main[j]=t;persist();renderSession();}
+function poolForItem(it){if(it.kind==='main')return poolFor(it.slot);if(it.kind==='core')return BANK.core;if(it.kind==='cardio')return BANK.cardio;if(it.kind==='warm')return BANK.warmGen;return [];}
+function findItem(rec,uid){var all=rec.main.concat(rec.warm,rec.core,rec.cardio?[rec.cardio]:[]);return all.find(function(it){return it.uid===uid;});}
+function openSwap(uid){
+  var rec=curSession();var item=findItem(rec,uid);if(!item)return;
+  var pool=poolForItem(item);var have=new Set();
+  rec.main.concat(rec.warm,rec.core,rec.cardio?[rec.cardio]:[]).forEach(function(it){have.add(it.e.n);});
+  var cp=pool.filter(function(e){return !have.has(e.n);});var chosen=[];
+  while(chosen.length<3&&cp.length){chosen.push(cp.splice(Math.floor(Math.random()*cp.length),1)[0]);}
+  SWAP[uid]=chosen;
+  var box=document.getElementById('swap-'+uid);
+  if(!chosen.length){box.innerHTML=`<div class="swap-box"><div class="sb-h">No other options in this group right now.</div></div>`;return;}
+  box.innerHTML=`<div class="swap-box"><div class="sb-h">Swap for one of these</div>`+chosen.map(function(e,j){return `<button class="swap-opt" onclick="doSwap('${uid}',${j})">${esc(e.n)} <span style="color:var(--gold-dark);font-size:10px">${typeTag(e.t)}</span></button>`;}).join('')+`<button class="swap-opt" style="text-align:center;color:var(--muted)" onclick="clearSwap('${uid}')">Cancel</button></div>`;
+}
+function clearSwap(uid){var b=document.getElementById('swap-'+uid);if(b)b.innerHTML='';}
+function doSwap(uid,j){var rec=curSession();var item=findItem(rec,uid);var ne=(SWAP[uid]||[])[j];if(!item||!ne)return;item.e=ne;delete store.logs[uid];persist();renderSession();}
 
-function simpleCard(key,name,tag,cue,check,rx){
-  const done=!!store[mk('done-'+key)];
-  const tagh=tag?`<span class="ex-tag">${tag}</span>`:'';
-  const rxh=rx?`<div class="ex-rx">${esc(rx)}</div>`:'';
-  const chk=check?`<div class="ex-check${done?' on':''}" onclick="toggleDone('${key}',this)"></div>`:'';
-  return `<div class="ex-card${done?' done':''}" id="x-${key}">
-    <div class="ex-head">${chk}
-      <div class="ex-main" onclick="openCard('${key}')"><div class="ex-name">${esc(name)}${tagh}</div>${rxh}</div>
-      <span class="chev" onclick="openCard('${key}')">&#9660;</span>
-    </div>
-    <div class="ex-body"><div class="cue">${esc(cue)}</div></div>
-  </div>`;
-}
-function mainCard(key,e,d){
-  const done=!!store[mk('done-'+key)];
-  const last=store[lastKey(e.n)];
-  const lasth=last?`<div class="lastwt">Last time: ${esc(last)}</div>`:'';
-  const sets=store[mk('log-'+key)]||[{},{},{}];
-  const rows=sets.map((s,si)=>`<div class="log-row"><span class="setn">Set ${si+1}</span>`+
-    `<input class="log-in" inputmode="numeric" placeholder="weight" value="${esc(s.wt||'')}" onchange="setLog('${key}','${jsName(e.n)}',${si},'wt',this.value)">`+
-    `<input class="log-in" inputmode="numeric" placeholder="reps" value="${esc(s.reps||'')}" onchange="setLog('${key}','${jsName(e.n)}',${si},'reps',this.value)">`+
-    `<input class="log-in" inputmode="numeric" placeholder="RPE" value="${esc(s.rpe||'')}" onchange="setLog('${key}','${jsName(e.n)}',${si},'rpe',this.value)"></div>`).join('');
-  const feel=store[mk('feel-'+key)]||'';
-  return `<div class="ex-card${done?' done':''}" id="x-${key}">
-    <div class="ex-head">
-      <div class="ex-check${done?' on':''}" onclick="toggleDone('${key}',this)"></div>
-      <div class="ex-main" onclick="openCard('${key}')"><div class="ex-name">${esc(e.n)}<span class="ex-tag">${typeTag(e.t)}</span></div>
-        <div class="ex-rx">${d.sets} sets &middot; ${d.reps} reps &middot; RPE ${d.rpe}</div></div>
-      <span class="chev" onclick="openCard('${key}')">&#9660;</span>
-    </div>
-    <div class="ex-body">
-      <div class="cue">${esc(e.c)}</div>
-      <div class="dose-grid">
-        <span class="dose-pill"><b>${d.sets}</b> sets</span>
-        <span class="dose-pill"><b>${d.reps}</b> reps</span>
-        <span class="dose-pill">${d.rir}</span>
-        <span class="dose-pill">RPE <b>${d.rpe}</b></span>
-        <span class="dose-pill">Zone <b>${d.zone}</b></span>
-      </div>
-      ${e.coach?`<div class="coach-note">&#9733; Kelly: ${esc(e.coach)}</div>`:''}
-      <div class="log-wrap">
-        <div class="log-title">Log your sets &nbsp;·&nbsp; weight / reps / RPE</div>
-        ${lasth}${rows}
-        <button class="add-set" onclick="addSet('${key}')">+ Add set</button>
-        <div class="feel-row"><input class="log-in" placeholder="How did it feel? (optional note)" value="${esc(feel)}" onchange="setFeel('${key}',this.value)"></div>
-      </div>
-    </div>
-  </div>`;
-}
-function jsName(n){return n.replace(/'/g,"\\'").replace(/"/g,'');}
-function openCard(key){document.getElementById('x-'+key).classList.toggle('open');}
-function toggleDone(key,el){ev_stop();const k=mk('done-'+key);store[k]=!store[k];persist();const c=document.getElementById('x-'+key);c.classList.toggle('done',!!store[k]);el.classList.toggle('on',!!store[k]);}
-function ev_stop(){if(window.event)window.event.stopPropagation();}
-function setLog(key,name,si,f,v){
-  const k=mk('log-'+key);let a=store[k];if(!Array.isArray(a)||!a.length)a=[{},{},{}];if(!a[si])a[si]={};a[si][f]=v;store[k]=a;
-  if(f==='wt'&&v){ const reps=a[si].reps?(' x '+a[si].reps):''; store[lastKey(name)]=v+(reps?reps+' reps':' lb'); }
-  persist();
-}
-function setFeel(key,v){store[mk('feel-'+key)]=v;persist();}
-function addSet(key){const k=mk('log-'+key);let a=store[k];if(!Array.isArray(a)||!a.length)a=[{},{},{}];a.push({});store[k]=a;persist();renderSession();}
-
-/* ---------- EMAIL LOG ---------- */
 function emailLog(){
-  if(!session)return;
-  const d=DOSE[session.focus];
-  let b='Kelly — '+DAY_META[session.day].label+' ('+d.label+' day)\n'+session.date+'\n\n';
-  b+='MAIN BLOCK (target '+d.reps+' reps, '+d.rir+', RPE '+d.rpe+')\n';
-  session.main.forEach((e,i)=>{
-    const key='m'+i;
-    const sets=store[mk('log-'+key)]||[];
-    const logged=sets.filter(s=>s.wt||s.reps||s.rpe).map(s=>`${s.wt||'?'}lb x ${s.reps||'?'} @RPE${s.rpe||'?'}`).join(', ');
-    const feel=store[mk('feel-'+key)];
-    b+='• '+e.n+(logged?(' — '+logged):' — (not logged)')+(feel?('  ['+feel+']'):'')+'\n';
-  });
-  b+='\nCORE: '+session.core.map(e=>e.n).join(', ')+'\n';
-  b+='CARDIO: '+(session.cardio?session.cardio.n:'')+'\n';
-  b+='\nSent from my OrthoCare training app.';
-  const subj='Kelly workout log — '+session.date+' ('+DAY_META[session.day].label+')';
+  var rec=curSession();if(!rec)return;var d=DOSE[rec.focus];var NL=String.fromCharCode(10);
+  var lines=rec.main.map(function(m){var L=logFor(m.uid);var logged=L.sets.filter(function(s){return s.wt||s.reps||s.rpe;}).map(function(s){return (s.wt||'?')+'lb x '+(s.reps||'?')+' @RPE'+(s.rpe||'?');}).join(', ');return '• '+m.e.n+(logged?(' - '+logged):' - (not logged)')+(L.feel?('  ['+L.feel+']'):'');}).join(NL);
+  var cardio=rec.cardio?(NL+'CARDIO: '+rec.cardio.e.n):'';
+  var b=CLIENT_NAME+' - '+DAY_META[rec.day].label+' ('+d.label+')'+NL+rec.date+NL+NL+'MAIN BLOCK (target '+d.reps+', '+d.rir+', RPE '+d.rpe+')'+NL+lines+NL+NL+'CORE: '+rec.core.map(function(c){return c.e.n;}).join(', ')+cardio+NL+NL+'Sent from my OrthoCare training app.';
+  var subj=CLIENT_NAME+' workout log - '+rec.date+' ('+DAY_META[rec.day].label+')';
   window.location.href='mailto:'+KELLY_EMAIL+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(b);
 }
 
-/* ---------- GUIDE ---------- */
+function renderProgress(){
+  var ss=store.sessions;
+  var weekAgo=new Date(Date.now()-6*864e5).toISOString().slice(0,10);
+  var wk=ss.filter(function(s){return s.date>=weekAgo;}).length;
+  var h=`<div class="sum-row"><div class="sum-box"><div class="sum-num">${ss.length}</div><div class="sum-lbl">Sessions logged</div></div><div class="sum-box"><div class="sum-num">${wk}</div><div class="sum-lbl">This week</div></div></div>`;
+  if(!ss.length){h+=`<div class="intro-card"><p>No sessions yet. Build one from Today's Session and it will show up here so you can look back anytime.</p></div>`;}
+  h+=ss.map(function(s,i){return histCard(s,i);}).join('');
+  h+=`<div class="rep-foot">Your full training history<br>OrthoCare Concierge LLC | Kelly Davis</div>`;
+  document.getElementById('progress-content').innerHTML=h;
+}
+function histCard(s,i){
+  var done=s.main.filter(function(m){return logFor(m.uid).done;}).length;
+  var rows=s.main.map(function(m){var L=logFor(m.uid);var logged=L.sets.filter(function(x){return x.wt||x.reps||x.rpe;}).map(function(x){return (x.wt||'?')+'×'+(x.reps||'?')+(x.rpe?(' @'+x.rpe):'');}).join(', ');return `<div class="hist-row"><b>${esc(m.e.n)}</b>${logged?(' - '+esc(logged)):' - (not logged)'}${L.feel?(' &middot; '+esc(L.feel)):''}</div>`;}).join('');
+  var extra=`<div class="hist-row" style="color:var(--gold-dark)">Core: ${s.core.map(function(c){return esc(c.e.n);}).join(', ')}${s.cardio?(' &middot; Cardio: '+esc(s.cardio.e.n)):''}</div>`;
+  return `<div class="hist-card" id="h-${i}"><div class="hist-head" onclick="tog('h-${i}')"><div><div class="hist-date">${fmtDate(s.date)}</div><div class="hist-sub">${DAY_META[s.day].label} &middot; ${DOSE[s.focus].label}</div></div><span style="margin-left:auto;color:var(--gold);font-size:12px">${done}/${s.main.length} &#10003;</span><span class="chev">&#9660;</span></div><div class="hist-body">${rows}${extra}</div></div>`;
+}
+function tog(id){var el=document.getElementById(id);if(el)el.classList.toggle('open');}
+
 function renderGuide(){
-  const zrows=ZONES.map(z=>`<tr><td><b>Zone ${z.z}</b></td><td>${z.name}</td><td>${z.bpm} bpm</td><td>${z.feel}</td></tr>`).join('');
-  document.getElementById('guide-content').innerHTML=
-    `<div class="intro-card"><p>${GUIDE.intro}</p></div>`+
-    `<div class="guide-block"><h4>Picking your weight</h4><ul>${GUIDE.weights.map(t=>`<li>${t}</li>`).join('')}</ul></div>`+
-    `<div class="guide-block"><h4>Effort &amp; recovery</h4><ul>${GUIDE.effort.map(t=>`<li>${t}</li>`).join('')}</ul></div>`+
-    `<div class="guide-block"><h4>Your heart-rate zones</h4><table class="ztable"><tr><th></th><th>Feel</th><th>Range</th><th>Talk test</th></tr>${zrows}</table></div>`+
-    `<div class="guide-block"><h4>Hyrox race &amp; station notes</h4><ul>${GUIDE.hyrox.map(t=>`<li>${t}</li>`).join('')}</ul></div>`+
-    `<div class="guide-block flags"><h4>Back off and recover if</h4><ul>${GUIDE.flags.map(f=>`<li>${f}</li>`).join('')}</ul></div>`+
-    `<div class="rep-foot">OrthoCare Concierge LLC | Kelly Davis<br>Proprietary and confidential</div>`;
+  var z=ZONES.map(function(zz){return `<tr><td><b>Zone ${zz.z}</b></td><td>${zz.name}</td><td>${zz.bpm} bpm</td><td>${zz.feel}</td></tr>`;}).join('');
+  var h=`<div class="intro-card"><p>${GUIDE.intro}</p></div><div class="guide-block"><h4>Picking your weight</h4><ul>${GUIDE.weights.map(function(t){return `<li>${t}</li>`;}).join('')}</ul></div><div class="guide-block"><h4>Effort &amp; recovery</h4><ul>${GUIDE.effort.map(function(t){return `<li>${t}</li>`;}).join('')}</ul></div><div class="guide-block"><h4>Your heart-rate zones</h4><table class="ztable"><tr><th></th><th>Feel</th><th>Range</th><th>Talk test</th></tr>${z}</table></div>`;
+  if(GUIDE.hyrox) h+=`<div class="guide-block"><h4>Hyrox race &amp; station notes</h4><ul>${GUIDE.hyrox.map(function(t){return `<li>${t}</li>`;}).join('')}</ul></div>`;
+  h+=`<div class="guide-block flags"><h4>${GUIDE.hyrox?'Back off and recover if':'Stop and check with Kelly if'}</h4><ul>${GUIDE.flags.map(function(t){return `<li>${t}</li>`;}).join('')}</ul></div><div class="rep-foot">OrthoCare Concierge LLC | Kelly Davis</div>`;
+  document.getElementById('guide-content').innerHTML=h;
 }
 
 function renderRunning(){
-  let h=`<div class="intro-card"><p>${RUN_INTRO}</p></div>`;
-  h+=RUN_PLAN.map(w=>`<div class="guide-block"><h4>Week ${w.wk} &mdash; ${w.label}</h4><div class="block-note" style="margin:-2px 0 8px">${w.focus}</div><ul>${w.runs.map(r=>`<li>${r}</li>`).join('')}</ul></div>`).join('');
-  h+=`<div class="guide-block"><h4>Running notes</h4><ul>${RUN_TIPS.map(t=>`<li>${t}</li>`).join('')}</ul></div>`;
+  if(typeof RUN_PLAN==='undefined'){return;}
+  var h=`<div class="intro-card"><p>${RUN_INTRO}</p></div>`;
+  h+=RUN_PLAN.map(function(w){return `<div class="guide-block"><h4>Week ${w.wk} &mdash; ${w.label}</h4><div class="block-note" style="margin:-2px 0 8px">${w.focus}</div><ul>${w.runs.map(function(r){return `<li>${r}</li>`;}).join('')}</ul></div>`;}).join('');
+  h+=`<div class="guide-block"><h4>Running notes</h4><ul>${RUN_TIPS.map(function(t){return `<li>${t}</li>`;}).join('')}</ul></div>`;
   h+=`<div class="rep-foot">7-week build to race day<br>OrthoCare Concierge LLC | Kelly Davis</div>`;
   document.getElementById('running-content').innerHTML=h;
 }
+
+function renderHep(){
+  if(typeof HEP==='undefined'){return;}
+  var h=`<div class="intro-card"><p>Your daily mobility. Do these most days to keep your hips and pelvis moving well. Tap for cues and video.</p></div>`;
+  h+=HEP.map(function(e,i){
+    var vid=e.video?`<div class="hep-vid"><video src="${e.video}?v=1" autoplay muted loop playsinline preload="metadata"></video></div>`:'';
+    var cues=`<ul style="list-style:none;padding:0;margin:0">`+e.cues.map(function(c){return `<li class="cue" style="padding-left:14px;position:relative;margin-bottom:6px"><span style="position:absolute;left:0;color:var(--gold)">&bull;</span>${esc(c)}</li>`;}).join('')+`</ul>`;
+    return `<div class="ex-card" id="hep-${i}"><div class="ex-head"><div class="ex-main" onclick="tog('hep-${i}')"><div class="ex-name">${esc(e.n)}</div><div class="ex-rx">${esc(e.rx)}</div></div><span class="chev" onclick="tog('hep-${i}')">&#9660;</span></div><div class="ex-body" style="padding-top:10px">${vid}${cues}</div></div>`;
+  }).join('');
+  h+=`<div class="rep-foot">OrthoCare Concierge LLC | Kelly Davis</div>`;
+  document.getElementById('hep-content').innerHTML=h;
+}
+
 document.title=CLIENT_NAME+' | OrthoCare Concierge';
 document.getElementById('hero-name').textContent=CLIENT_NAME;
 </script>
