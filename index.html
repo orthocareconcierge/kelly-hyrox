@@ -453,7 +453,7 @@ const RUN_TIPS = [
 const APP_ID='kelly_hyrox';
 const NS='oc_gen_'+APP_ID;
 let store={}; try{store=JSON.parse(localStorage.getItem(NS))||{};}catch(e){}
-store.sessions=store.sessions||[]; store.logs=store.logs||{}; store.last=store.last||{};
+store.sessions=store.sessions||[]; store.logs=store.logs||{}; store.last=store.last||{}; store.customBank=store.customBank||[];
 var SWAP={};
 function persist(){try{localStorage.setItem(NS,JSON.stringify(store));}catch(e){}}
 function todayStr(){return new Date().toISOString().slice(0,10);}
@@ -590,6 +590,30 @@ function addSet(uid){var rec=curSession();var it=findItem(rec,uid);var name=it?i
 function moveMain(uid,dir){var rec=curSession();var idx=rec.main.findIndex(function(it){return it.uid===uid;});var j=idx+dir;if(j<0||j>=rec.main.length)return;var t=rec.main[idx];rec.main[idx]=rec.main[j];rec.main[j]=t;persist();renderSession();}
 function poolForItem(it){if(it.kind==='main')return poolFor(it.slot);if(it.kind==='core')return BANK.core;if(it.kind==='cardio')return BANK.cardio;if(it.kind==='warm')return BANK.warmGen;return [];}
 function findItem(rec,uid){var all=rec.main.concat(rec.warm,rec.core,rec.cardio?[rec.cardio]:[]);return all.find(function(it){return it.uid===uid;});}
+/* Which BANK pools a write-in belongs to, so it comes back in future rolls and swaps. */
+function bankKeysFor(item){
+  if(item.kind==='core')return['core'];
+  if(item.kind==='cardio')return['cardio'];
+  if(item.kind==='warm')return['warmGen'];
+  var map={EXTRA_LOWER:['squat','hinge','lunge'],FULL_LOWER_PUSH:['squat','lunge'],FULL_UPPER_PUSH:['pushH','pushV'],FULL_UPPER_PULL:['pullH','pullV'],HYROX:['hyrox']};
+  return map[item.slot]||[item.slot];
+}
+/* Merge saved write-ins into the live bank so they appear as options again. Runs at startup and after each new write-in. */
+function applyCustomBank(){
+  (store.customBank||[]).forEach(function(c){
+    (c.keys||[]).forEach(function(k){
+      if(!BANK[k])return;
+      if(BANK[k].some(function(e){return e.n===c.n;}))return;
+      BANK[k].push({n:c.n,t:c.t||'',c:c.cue||'Your pick. Log it as you go.',u:c.u||'wr'});
+    });
+  });
+}
+function recordCustom(item){
+  var name=item.e.n;
+  if((store.customBank||[]).some(function(c){return c.n===name;}))return;
+  store.customBank.push({n:name,keys:bankKeysFor(item),t:item.e.t||'',u:item.e.u||'wr',cue:item.e.c||''});
+  persist(); applyCustomBank();
+}
 function openSwap(uid){
   var rec=curSession();var item=findItem(rec,uid);if(!item)return;
   var pool=poolForItem(item);var have=new Set();
@@ -605,7 +629,7 @@ function openSwap(uid){
 function clearSwap(uid){var b=document.getElementById('swap-'+uid);if(b)b.innerHTML='';}
 function doSwap(uid,j){var rec=curSession();var item=findItem(rec,uid);var ne=(SWAP[uid]||[])[j];if(!item||!ne)return;item.e=ne;delete store.logs[uid];persist();renderSession();}
 function customSwap(uid){var b=document.getElementById('swap-'+uid);if(!b)return;b.innerHTML=`<div class="swap-box"><div class="sb-h">Write in your exercise</div><input id="cin-${uid}" class="log-in" placeholder="Type the exercise you want" style="width:100%;box-sizing:border-box;margin-bottom:8px"><button class="swap-opt" onclick="saveCustom('${uid}')">Use this</button><button class="swap-opt" style="text-align:center;color:var(--muted)" onclick="clearSwap('${uid}')">Cancel</button></div>`;var i=document.getElementById('cin-'+uid);if(i)i.focus();}
-function saveCustom(uid){var i=document.getElementById('cin-'+uid);var v=i?i.value.trim():'';if(!v){if(i)i.focus();return;}var rec=curSession();var item=findItem(rec,uid);if(!item)return;item.e={n:v,t:item.e.t||'',c:'Your pick. Log it as you go.',u:item.e.u||'wr'};delete store.logs[uid];persist();renderSession();var el=document.getElementById('x-'+uid);if(el)el.classList.add('open');}
+function saveCustom(uid){var i=document.getElementById('cin-'+uid);var v=i?i.value.trim():'';if(!v){if(i)i.focus();return;}var rec=curSession();var item=findItem(rec,uid);if(!item)return;item.e={n:v,t:item.e.t||'',c:'Your pick. Log it as you go.',u:item.e.u||'wr'};recordCustom(item);delete store.logs[uid];persist();renderSession();var el=document.getElementById('x-'+uid);if(el)el.classList.add('open');}
 
 function emailLog(){
   var rec=curSession();if(!rec)return;var d=DOSE[rec.focus];var NL=String.fromCharCode(10);
@@ -663,6 +687,7 @@ function renderHep(){
   document.getElementById('hep-content').innerHTML=h;
 }
 
+applyCustomBank();
 document.title=CLIENT_NAME+' | OrthoCare Concierge';
 document.getElementById('hero-name').textContent=CLIENT_NAME;
 </script>
